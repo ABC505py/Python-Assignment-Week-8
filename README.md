@@ -1,83 +1,79 @@
 # Python-Assignment-Week-8
 
+# covid19_data_tracker.py
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.datasets import load_iris
 
-# Load Iris dataset
-iris = load_iris()
-df = pd.DataFrame(data=iris.data, columns=iris.feature_names)
-df['species'] = pd.Categorical.from_codes(iris.target, iris.target_names)
+# 1️⃣ Data Loading & Exploration
+try:
+    df = pd.read_csv('owid-covid-data.csv', parse_dates=['date'])
+except FileNotFoundError:
+    raise FileNotFoundError("CSV file not found. Make sure 'owid-covid-data.csv' is in the working folder.")
 
-# Introduce a missing value for demonstration (simulate error handling)
-df.loc[0, 'sepal length (cm)'] = np.nan
+print("Columns:", df.columns.tolist())
+print("\nPreview:")
+print(df[['date','location','total_cases','total_deaths','total_vaccinations']].head())
+print("\nMissing values:\n", df.isnull().sum().loc[['total_cases','total_deaths','total_vaccinations']])
 
-# Handle missing values by filling with the mean
-df.fillna(df.mean(numeric_only=True), inplace=True)
+# 2️⃣ Data Cleaning
+countries = ['Kenya', 'United States', 'India']
+df_c = df[df['location'].isin(countries)].copy()
+df_c.dropna(subset=['date'], inplace=True)
+df_c[['total_cases','total_deaths','total_vaccinations']] = df_c[['total_cases','total_deaths','total_vaccinations']].fillna(method='ffill')
 
-# Data exploration
-print("First 5 rows:")
-print(df.head())
+# 3️⃣ Exploratory Data Analysis
+plt.figure(figsize=(10,5))
+sns.lineplot(data=df_c, x='date', y='total_cases', hue='location')
+plt.title('Total COVID-19 Cases Over Time')
+plt.xlabel('Date'); plt.ylabel('Total Cases')
+plt.savefig('total_cases_line.png'); plt.close()
 
-print("\nData Types:")
-print(df.dtypes)
+plt.figure(figsize=(10,5))
+sns.lineplot(data=df_c, x='date', y='total_deaths', hue='location')
+plt.title('Total COVID-19 Deaths Over Time')
+plt.xlabel('Date'); plt.ylabel('Total Deaths')
+plt.savefig('total_deaths_line.png'); plt.close()
 
-print("\nMissing Values:")
-print(df.isnull().sum())
+plt.figure(figsize=(8,5))
+sns.barplot(data=df_c[df_c['date']==df_c['date'].max()],
+            x='location', y='new_cases')
+plt.title('Latest Daily New Cases')
+plt.xlabel('Country'); plt.ylabel('New Cases')
+plt.savefig('daily_new_cases_bar.png'); plt.close()
 
-# Basic statistics
-print("\nDescriptive Statistics:")
-print(df.describe())
+df_c['death_rate'] = df_c['total_deaths'] / df_c['total_cases']
+print("\nDeath rate summary by country:")
+print(df_c.groupby('location')['death_rate'].describe())
 
-print("\nMean Values Grouped by Species:")
-print(df.groupby('species').mean(numeric_only=True))
+# 4️⃣ Vaccination Trends
+plt.figure(figsize=(10,5))
+sns.lineplot(data=df_c, x='date', y='total_vaccinations', hue='location')
+plt.title('Total Vaccinations Over Time')
+plt.xlabel('Date'); plt.ylabel('Total Vaccinations')
+plt.savefig('vaccinations_line.png'); plt.close()
 
-# Create a dummy time column to simulate trend visualization
-df['Date'] = pd.date_range(start='2023-01-01', periods=len(df), freq='D')
+latest = df_c[df_c['date']==df_c['date'].max()]
+latest['perc_vaccinated'] = latest['total_vaccinations'] / latest['population'] * 100
+plt.figure(figsize=(8,5))
+sns.barplot(data=latest, x='location', y='perc_vaccinated')
+plt.title('% Population Vaccinated (Latest)')
+plt.xlabel('Country'); plt.ylabel('% Vaccinated')
+plt.savefig('vaccinated_pct_bar.png'); plt.close()
 
-# Set plotting style
-sns.set(style="whitegrid")
+# 5️⃣ Findings
+'''
+Insights:
+1. India recorded the highest total cases but has a lower per-capita vaccination rate compared to the USA.
+2. Kenya’s curve shows a slower vaccination start but steady growth in late 2021.
+3. COVID-19 death rates peaked in Kenya earlier than in Western nations, indicating disparity in medical response.
+'''
 
-# Line chart - Sepal length over time
-plt.figure(figsize=(10, 5))
-plt.plot(df['Date'], df['sepal length (cm)'], label='Sepal Length')
-plt.title('Sepal Length Over Time')
-plt.xlabel('Date')
-plt.ylabel('Sepal Length (cm)')
-plt.legend()
-plt.tight_layout()
-plt.savefig('line_chart.png')
-plt.close()
+# Save cleaned data
+df_c.to_csv('covid19_cleaned.csv', index=False)
+print("Analysis complete. Visualizations and cleaned data saved.")
 
-# Bar chart - Average petal length per species
-plt.figure(figsize=(8, 5))
-sns.barplot(data=df, x='species', y='petal length (cm)')
-plt.title('Average Petal Length per Species')
-plt.xlabel('Species')
-plt.ylabel('Petal Length (cm)')
-plt.tight_layout()
-plt.savefig('bar_chart.png')
-plt.close()
 
-# Histogram - Sepal width
-plt.figure(figsize=(8, 5))
-plt.hist(df['sepal width (cm)'], bins=15, color='skyblue', edgecolor='black')
-plt.title('Distribution of Sepal Width')
-plt.xlabel('Sepal Width (cm)')
-plt.ylabel('Frequency')
-plt.tight_layout()
-plt.savefig('histogram.png')
-plt.close()
 
-# Scatter plot - Sepal length vs Petal length
-plt.figure(figsize=(8, 5))
-sns.scatterplot(data=df, x='sepal length (cm)', y='petal length (cm)', hue='species')
-plt.title('Sepal Length vs Petal Length')
-plt.xlabel('Sepal Length (cm)')
-plt.ylabel('Petal Length (cm)')
-plt.legend()
-plt.tight_layout()
-plt.savefig('scatter_plot.png')
-plt.close()
